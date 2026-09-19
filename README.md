@@ -1,3 +1,10 @@
+Viewed README.md:1-407
+
+Here you go — copy everything below:
+
+---
+
+```markdown
 <div align="center">
 
 # 🏠 SmartHostel Management System
@@ -42,14 +49,13 @@
 | Feature | Description |
 |---------|-------------|
 | **Role-Based Access Control** | Dedicated portals for Admin, Committee members, and Students |
-| **QR Attendance Tracking** | Real-time meal attendance via QR code scanning (isolated microservice) |
+| **Attendance Tracking** | Meal attendance marking with RBAC + ABAC enforcement (isolated microservice) |
 | **Complaints & Maintenance** | Track, manage, and resolve hostel issues with sentiment analysis |
 | **Mess Menu Management** | View and update daily/weekly mess menus with meal schedules |
 | **Inventory Management** | Track hostel assets, stock levels, and low-stock alerts |
 | **Real-Time Notifications** | Instant alerts via Socket.IO + async email delivery via Redis pub/sub |
 | **Analytics & Dashboards** | Visual data representation using Recharts |
 | **Google OAuth** | Sign in with Google alongside traditional JWT authentication |
-| **Payment Integration** | Razorpay integration for mess fee payments |
 | **Email Service** | Transactional emails via SendGrid SMTP (OTP, password reset, notifications) |
 | **Token Refresh** | Secure access + refresh token rotation with Redis blacklisting |
 
@@ -69,7 +75,6 @@
 | Real-Time | Socket.IO Client |
 | HTTP Client | Axios (with request/response interceptors) |
 | Analytics | Recharts |
-| Payments | Razorpay Checkout |
 | Utilities | clsx, tailwind-merge, react-hot-toast, date-fns |
 
 ### Backend (server/)
@@ -90,11 +95,12 @@
 
 #### Attendance Service (services/attendance-service/)
 
-Isolated high-frequency meal/attendance marking with its own failure domain.
+Isolated high-frequency meal attendance marking with its own failure domain.
 
 - **Stack:** Node.js, Express 5, TypeScript, Prisma v6, ioRedis, JWT
+- **Endpoints:** `/mark` (single/bulk), `/health` (circuit break)
 - **RBAC:** Committee / Warden / Admin only; ABAC prevents self-marking
-- **Port:** 5002
+- **Port:** `5002`
 
 #### Notification Worker (services/notification-worker/)
 
@@ -119,31 +125,43 @@ Decoupled async email delivery. If this crashes, the main API keeps running.
 ## Architecture
 
 ```
-+--------------------------------------------------------------+
-|                  ample-learning (Frontend)                    |
-|              React 18 + Vite + TypeScript                    |
-|       https://ample-learning-production.up.railway.app       |
-+----------------------------+---------------------------------+
-                             | REST API + WebSocket
-                             v
-+--------------------------------------------------------------+
-|                 SmartHostel (Core API)                        |
-|             Node.js + Express 5 + Prisma ORM                 |
-|     https://smarthostel-production-2304.up.railway.app       |
-+---------+---------------------------+--------------------------+
-          |                           |
-          v                           v
-+------------------+       +-------------------------+
-|  PostgreSQL 16   |       |        Redis 7          |
-|  (Primary DB)    |       |  Cache + Pub/Sub +      |
-|                  |       |  Token Blacklist         |
-+------------------+       +-----------+-------------+
-                                       | Pub/Sub
-                                       v
-                           +-------------------------+
-                           |   Notification Worker   |
-                           |   (Async Email Queue)   |
-                           +-------------------------+
+┌──────────────────────────────────────────────────────────────┐
+│                         FRONTEND                              │
+│  React + TypeScript + Vite  →  Nginx (Docker)                │
+│  Role-based dashboards:  Student | Committee | Warden | Admin │
+└──────────┬───────────────────────────┬───────────────────────┘
+           │ REST API                  │ REST API
+           ▼                           ▼
+┌─────────────────────┐     ┌────────────────────────┐
+│      CORE API        │     │   ATTENDANCE SERVICE    │
+│  (Express + Prisma)  │     │   (Express + Prisma)    │
+│                      │     │                         │
+│  Auth (JWT + OAuth)  │     │  /mark (single/bulk)    │
+│  Rebates (ACID)      │◄────│  /health (circuit break)│
+│  Complaints          │     │  RBAC + ABAC enforced   │
+│  Inventory           │     │  Redis caching          │
+│  Notifications       │     └──────────┬──────────────┘
+│  Menu, Analytics     │                │
+└──────┬───────────────┘                │
+       │ Redis pub/sub                  │
+       ▼                                │
+┌──────────────────┐                    │
+│  NOTIFICATION    │                    │
+│  WORKER          │                    │
+│  (Node.js)       │                    │
+│  Subscribe →     │                    │
+│  Send SMTP email │                    │
+│  No exposed port │                    │
+└──────────────────┘                    │
+                                        │
+       ┌────────────────────────────────┘
+       ▼
+┌──────────────────────────────────────────┐
+│           SHARED INFRASTRUCTURE           │
+│  PostgreSQL 16  (ACID, Prisma ORM)       │
+│  Redis 7        (Cache + Pub/Sub + Blacklist) │
+│  Docker Compose (5 containers)           │
+└──────────────────────────────────────────┘
 ```
 
 ---
@@ -154,38 +172,38 @@ Decoupled async email delivery. If this crashes, the main API keeps running.
 SmartHostel/
 ├── client/                        # React + Vite frontend
 │   ├── src/
-│   │   ├── components/            # Reusable UI components
-│   │   │   ├── auth/              # ProtectedRoute, etc.
-│   │   │   └── layout/            # Navbar, Sidebar
-│   │   ├── pages/                 # Route-level page components
-│   │   │   ├── auth/              # Login, Register, OAuth callback
-│   │   │   ├── student/           # Student dashboard & pages
-│   │   │   ├── committee/         # Committee pages
-│   │   │   └── admin/             # Admin dashboard & pages
-│   │   ├── stores/                # Zustand state stores
-│   │   └── lib/                   # Axios API client, socket.io, utils
+│   │   ├── components/
+│   │   │   ├── auth/
+│   │   │   └── layout/
+│   │   ├── pages/
+│   │   │   ├── auth/
+│   │   │   ├── student/
+│   │   │   ├── committee/
+│   │   │   └── admin/
+│   │   ├── stores/
+│   │   └── lib/
 │   ├── .env.example
 │   └── Dockerfile
 │
 ├── server/                        # Node.js + Express core API
 │   ├── src/
-│   │   ├── controllers/           # Route handlers
-│   │   ├── routes/                # API route definitions
-│   │   ├── services/              # Business logic layer
-│   │   ├── middleware/            # Auth, error handling, validation
-│   │   ├── sockets/               # Socket.IO event handlers
-│   │   ├── jobs/                  # Background cron jobs
-│   │   ├── config/                # DB, Redis, env config
-│   │   ├── validators/            # Zod schemas
-│   │   ├── utils/                 # Logger, JWT, email, bcrypt
-│   │   └── seed.ts                # Database seeder
-│   ├── prisma/                    # Prisma schema & migrations
+│   │   ├── controllers/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   ├── middleware/
+│   │   ├── sockets/
+│   │   ├── jobs/
+│   │   ├── config/
+│   │   ├── validators/
+│   │   ├── utils/
+│   │   └── seed.ts
+│   ├── prisma/
 │   ├── .env.example
-│   ├── entrypoint.sh              # Docker entrypoint (migrate + seed + start)
+│   ├── entrypoint.sh
 │   └── Dockerfile
 │
 ├── services/
-│   ├── attendance-service/        # QR attendance microservice (port 5002)
+│   ├── attendance-service/        # Meal attendance microservice (port 5002)
 │   └── notification-worker/       # Async email worker (Redis pub/sub)
 │
 ├── docker-compose.yml
@@ -214,7 +232,7 @@ cd SmartHostel
 ```bash
 # Backend
 cp server/.env.example server/.env
-# Fill in: DATABASE_URL, JWT secrets, SendGrid key, Razorpay keys, Google OAuth
+# Fill in: DATABASE_URL, JWT secrets, SendGrid key, Google OAuth
 
 # Frontend
 cp client/.env.example client/.env
@@ -224,8 +242,6 @@ cp client/.env.example client/.env
 ---
 
 ## Running with Docker (Recommended)
-
-Starts everything — PostgreSQL, Redis, Backend API, Attendance Service, Notification Worker, and Frontend.
 
 ```bash
 docker-compose up -d --build
@@ -288,42 +304,30 @@ npm run dev
 NODE_ENV=development
 PORT=5000
 
-# Database
 DATABASE_URL=postgresql://postgres:postgres123@localhost:5432/hostel_db
 DB_CONNECTION_LIMIT=5
 
-# Redis
 REDIS_URL=redis://localhost:6379
 
-# JWT
 JWT_SECRET=your-32-char-secret-here
 JWT_REFRESH_SECRET=your-32-char-refresh-secret
 JWT_EXPIRES_IN=15m
 JWT_REFRESH_EXPIRES_IN=7d
 
-# Email — SendGrid SMTP
 SMTP_HOST=smtp.sendgrid.net
 SMTP_PORT=587
 SMTP_USER=apikey
 SMTP_PASS=your-sendgrid-api-key
 FROM_EMAIL=noreply@yourdomain.com
 
-# URLs
 APP_URL=http://localhost:5173
 CLIENT_URL=http://localhost:3000
 
-# Security
 QR_SECRET=your-qr-secret-key
 
-# Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX=100
 
-# Razorpay
-RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxx
-RAZORPAY_KEY_SECRET=your-razorpay-secret
-
-# Google OAuth — https://console.cloud.google.com/apis/credentials
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_CALLBACK_URL=http://localhost:5000/api/v1/auth/google/callback
@@ -361,6 +365,7 @@ Base URL: `https://smarthostel-production-2304.up.railway.app/api/v1`
 | GET | /menu | Get mess menu | Yes |
 | POST | /menu | Create/update menu | Admin |
 | GET | /attendance | Attendance records | Yes |
+| POST | /attendance/mark | Mark meal attendance | Committee |
 | GET | /notifications | Get notifications | Yes |
 | GET | /rebates | Mess rebate requests | Yes |
 | POST | /rebates | Apply for rebate | Student |
@@ -371,8 +376,6 @@ Base URL: `https://smarthostel-production-2304.up.railway.app/api/v1`
 ---
 
 ## Deployment
-
-Deployed on **Railway** with the following services:
 
 | Railway Service | Role | URL |
 |----------------|------|-----|
