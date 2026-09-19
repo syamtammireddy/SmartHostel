@@ -1,10 +1,3 @@
-Viewed README.md:1-407
-
-Here you go — copy everything below:
-
----
-
-```markdown
 <div align="center">
 
 # 🏠 SmartHostel Management System
