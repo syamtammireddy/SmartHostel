@@ -12,7 +12,7 @@
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com)
 
-**Live Demo:** [https://ample-learning-production.up.railway.app](https://ample-learning-production.up.railway.app)
+**Live Demo:** [[https://ample-learning-production.up.railway.app](https://smarthostel-production-bc43.up.railway.app)]
 
 | Role | Email | Password |
 |------|-------|----------|
